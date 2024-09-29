@@ -4,7 +4,7 @@ from pathlib import Path
 import requests
 
 from guessit import guessit
-
+from imdb import IMDb
 from PtpUploader.PtpUploaderException import PtpUploaderException
 from PtpUploader.Settings import Settings, config
 
@@ -40,7 +40,44 @@ class ReleaseNameParser:
                     logger.debug("srrdb.com result: %s", result)
                 logger.error("Failed scene from srrdb.com: %s", e)
 
+    def get_imdb_id(self, movie_name, movie_year=None):  # Add 'self' parameter here
+        ia = IMDb()
+
+        # Search for the movie by name
+        search_results = ia.search_movie(movie_name)
+
+        # Filter the search results by year if provided
+        filtered_results = [movie for movie in search_results if movie.get('year') == movie_year]
+
+        # Check if we found any results
+        if filtered_results:
+            movie = filtered_results[0]  # Get the first result
+            imdb_id = movie.movieID
+            logger.debug("Found IMDb result: %r (%s), ID %s", movie['title'], movie.get('year'), imdb_id)
+            return imdb_id
+        else:
+            print("Movie not found.")
+            return 0
+
     def GetSourceAndFormat(self, releaseInfo):
+        if not releaseInfo.ImdbId:
+            # Check if 'title' and 'year' exist in the guess result and contain valid data
+            if self.guess.get("title") and self.guess.get("year"):
+                logger.debug(f"No IMDBID Using GuessIt Title Year")
+
+                # Assign the title and year to the releaseInfo object
+                releaseInfo.Title = self.guess["title"][0]
+                releaseInfo.Year = self.guess["year"][0]
+
+                # Fetch IMDb ID based on the title and year
+                getImdb = self.get_imdb_id(self.guess["title"][0], self.guess["year"][0])
+                releaseInfo.ImdbId = getImdb
+
+                logger.debug(f"GSF: Title: {releaseInfo.Title} Year: {releaseInfo.Year}")
+            else:
+                # Handle cases where title or year is missing
+                logger.debug("Title or Year not found in the guess results.")
+
         if releaseInfo.Codec:
             logger.info(
                 "Codec '%s' is already set, not getting from release name."
