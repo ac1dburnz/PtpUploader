@@ -178,38 +178,47 @@ def settings(request):
 @login_required
 def bulk_upload(request):
     if request.method == "POST":
-        # create a form instance and populate it with data from the request:
         form = forms.BulkReleaseForm(request.POST)
-        # check whether it's valid:
         if form.is_valid():
+            # Process links
             for link in form.cleaned_data["Links"].split("\n"):
+                link = link.strip()
+                if not link:
+                    continue
                 release = ReleaseInfo(AnnouncementId=link)
                 release.JobStartMode = JobStartMode.Manual
-                if "post_stop_before" in request.POST:
-                    release.StopBeforeUploading = True
-                else:
-                    release.StopBeforeUploading = False
+                release.StopBeforeUploading = "post_stop_before" in request.POST
                 release.save()
-            for path in form.cleaned_data["Paths"].split("\n"):
-                if not path.strip():
+
+            # Process paths from 'Paths' field
+            for path_str in form.cleaned_data["Paths"].split("\n"):
+                path_str = path_str.strip()
+                if not path_str:
                     continue
-                path = Path(path)
+                path = Path(path_str)
                 release = ReleaseInfo()
                 release.AnnouncementSourceName = "file"
                 release.ReleaseDownloadPath = path
                 release.ReleaseName = path.name
                 release.JobStartMode = JobStartMode.Manual
-                if "post_stop_before" in request.POST:
-                    release.StopBeforeUploading = True
-                else:
-                    release.StopBeforeUploading = False
+                release.StopBeforeUploading = "post_stop_before" in request.POST
                 release.save()
-            # process the data in form.cleaned_data as required
-            # ...
-            # redirect to a new URL:
-            return HttpResponseRedirect("/jobs")
 
-    # if a GET (or any other method) we'll create a blank form
+            # Process paths from 'LocalFile' field
+            for path_str in form.cleaned_data["LocalFile"].split(","):
+                path_str = path_str.strip()
+                if not path_str:
+                    continue
+                path = Path(path_str)
+                release = ReleaseInfo()
+                release.AnnouncementSourceName = "file"
+                release.ReleaseDownloadPath = path
+                release.ReleaseName = path.name
+                release.JobStartMode = JobStartMode.Manual
+                release.StopBeforeUploading = "post_stop_before" in request.POST
+                release.save()
+
+            return HttpResponseRedirect("/jobs")
     else:
         form = forms.BulkReleaseForm()
 
@@ -313,6 +322,37 @@ def local_dir(request):
             c["icon"] = "film"
         val.append(c)
     return JsonResponse(val, safe=False)  # It's just a list, probably safe
+
+
+@login_required
+def file_listBulkUpload(request):
+    source = Path(config.web.file_selector_root)
+    if not source.exists():
+        return JsonResponse(
+            [{"title": f"Upload directory does not exist: {source}", "children": []}],
+            safe=False,
+        )
+    tree = []
+    files = [f for f in source.rglob("*") if f.is_file()]
+    for f in files:
+        subroot = tree
+        f_rel = f.relative_to(source)
+        for p in f_rel.parts[:-1]:
+            path_match = [c for c in subroot if c["title"] == p]
+            if not path_match:
+                new_node = {"title": p, "folder": True, "children": []}
+                subroot.append(new_node)
+                subroot = new_node["children"]
+            else:
+                subroot = path_match[0]["children"]
+        subroot.append(
+            {
+                "title": f_rel.name,
+                "key": str(f),
+                "selected": False,  # Set to True if pre-selecting
+            }
+        )
+    return JsonResponse(tree, safe=False)
 
 
 @login_required
