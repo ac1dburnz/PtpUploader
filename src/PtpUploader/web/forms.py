@@ -19,6 +19,7 @@ from PtpUploader import ImageHost, ptp_subtitle
 from PtpUploader.Job.JobStartMode import JobStartMode
 from PtpUploader.ReleaseInfo import ReleaseInfo
 from PtpUploader.Settings import config
+from django import forms
 
 
 class SettingsForm(Form):
@@ -54,16 +55,7 @@ class MultipleFileInput(ClearableFileInput):
 class BulkReleaseForm(Form):
     Links = CharField(widget=Textarea(attrs={"placeholder": "Links"}), required=False)
     Paths = CharField(widget=Textarea(attrs={"placeholder": "Paths"}), required=False)
-    Files = FileField(
-        widget=MultipleFileInput(
-            attrs={
-                "class": "file-input",
-                "multiple": "multiple",
-                "accept": "application/x-bittorrent",
-            }
-        ),
-        required=False,
-    )
+    LocalFile = forms.CharField(required=False, widget=forms.HiddenInput())
 
 
 class ReleaseForm(ModelForm):
